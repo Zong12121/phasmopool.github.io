@@ -1,0 +1,179 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private user profile metadata isolated per authenticated user.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Display name shown in UI."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 256,
+          "description": "Private verified user email."
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 512,
+          "description": "Avatar URL."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "email", "createdAt", "updatedAt"]
+    },
+    "ModeGenerationState": {
+      "title": "ModeGenerationState",
+      "description": "Persisted neuroevolution generation progress and best neural genome per mode for a user.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["navigation", "balance", "parkour", "biomechanics", "manual_car", "drone"]
+        },
+        "generation": {
+          "type": "integer"
+        },
+        "bestDistanceEver": {
+          "type": "number"
+        },
+        "bestFitnessEver": {
+          "type": "number"
+        },
+        "milestone30mReached": {
+          "type": "boolean"
+        },
+        "activationFn": {
+          "type": "string",
+          "enum": ["tanh", "swish", "leaky_relu"]
+        },
+        "populationSize": {
+          "type": "integer"
+        },
+        "mutationRate": {
+          "type": "number"
+        },
+        "mutationStrength": {
+          "type": "number"
+        },
+        "bestGenome": {
+          "type": "object"
+        },
+        "history": {
+          "type": "array"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "mode",
+        "generation",
+        "bestDistanceEver",
+        "bestFitnessEver",
+        "milestone30mReached",
+        "activationFn",
+        "populationSize",
+        "mutationRate",
+        "mutationStrength",
+        "bestGenome",
+        "history",
+        "updatedAt"
+      ]
+    },
+    "SavedCheckpoint": {
+      "title": "SavedCheckpoint",
+      "description": "Named user-bookmarked neural network champion checkpoint.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["navigation", "balance", "parkour", "biomechanics", "manual_car", "drone"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "generation": {
+          "type": "integer"
+        },
+        "bestDistance": {
+          "type": "number"
+        },
+        "bestFitness": {
+          "type": "number"
+        },
+        "activationFn": {
+          "type": "string",
+          "enum": ["tanh", "swish", "leaky_relu"]
+        },
+        "genome": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "mode",
+        "name",
+        "generation",
+        "bestDistance",
+        "bestFitness",
+        "activationFn",
+        "genome",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/private/profile": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner-only private user profile document."
+    },
+    "/users/{userId}/modeStates/{modeId}": {
+      "schema": { "$ref": "#/entities/ModeGenerationState" },
+      "description": "Saved current generation, records, hyperparameters, and champion genome per simulation mode."
+    },
+    "/users/{userId}/checkpoints/{checkpointId}": {
+      "schema": { "$ref": "#/entities/SavedCheckpoint" },
+      "description": "Named saved neural network champion checkpoints for a user."
+    }
+  }
+}

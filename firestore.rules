@@ -1,0 +1,165 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerified() && request.auth.uid == userId && isValidId(userId);
+    }
+
+    function isValidMode(mode) {
+      return mode is string && mode in ['navigation', 'balance', 'parkour', 'biomechanics', 'manual_car', 'drone'];
+    }
+
+    function isValidActivation(act) {
+      return act is string && act in ['tanh', 'swish', 'leaky_relu'];
+    }
+
+    function isValidGenome(g) {
+      return g is map
+        && g.keys().hasAll(['inputSize', 'hiddenSize', 'outputSize', 'activationFn', 'wIH', 'bH', 'wHO', 'bO'])
+        && g.keys().hasOnly(['inputSize', 'hiddenSize', 'outputSize', 'activationFn', 'wIH', 'bH', 'wHO', 'bO'])
+        && g.inputSize is int && g.inputSize >= 1 && g.inputSize <= 64
+        && g.hiddenSize is int && g.hiddenSize >= 1 && g.hiddenSize <= 64
+        && g.outputSize is int && g.outputSize >= 1 && g.outputSize <= 32
+        && isValidActivation(g.activationFn)
+        && g.wIH is list && g.wIH.size() > 0 && g.wIH.size() <= 1024 && g.wIH[0] is number
+        && g.bH is list && g.bH.size() > 0 && g.bH.size() <= 64 && g.bH[0] is number
+        && g.wHO is list && g.wHO.size() > 0 && g.wHO.size() <= 512 && g.wHO[0] is number
+        && g.bO is list && g.bO.size() > 0 && g.bO.size() <= 32 && g.bO[0] is number;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid == userId && data.uid == request.auth.uid
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 256
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 512))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidModeState(data, userId, modeId) {
+      return data.keys().hasAll([
+          'uid', 'mode', 'generation', 'bestDistanceEver', 'bestFitnessEver',
+          'milestone30mReached', 'activationFn', 'populationSize', 'mutationRate',
+          'mutationStrength', 'bestGenome', 'history', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'mode', 'generation', 'bestDistanceEver', 'bestFitnessEver',
+          'milestone30mReached', 'activationFn', 'populationSize', 'mutationRate',
+          'mutationStrength', 'bestGenome', 'history', 'updatedAt'
+        ])
+        && data.uid is string && data.uid == userId && data.uid == request.auth.uid
+        && isValidMode(data.mode) && data.mode == modeId
+        && data.generation is int && data.generation >= 1 && data.generation <= 1000000
+        && data.bestDistanceEver is number
+        && data.bestFitnessEver is number
+        && data.milestone30mReached is bool
+        && isValidActivation(data.activationFn)
+        && data.populationSize is int && data.populationSize >= 4 && data.populationSize <= 32
+        && data.mutationRate is number && data.mutationRate >= 0.01 && data.mutationRate <= 1.0
+        && data.mutationStrength is number && data.mutationStrength >= 0.01 && data.mutationStrength <= 2.0
+        && isValidGenome(data.bestGenome)
+        && data.history is list && data.history.size() <= 40
+        && (data.history.size() == 0 || data.history[0] is map)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCheckpoint(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'mode', 'name', 'generation', 'bestDistance', 'bestFitness',
+          'activationFn', 'genome', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'mode', 'name', 'generation', 'bestDistance', 'bestFitness',
+          'activationFn', 'genome', 'createdAt'
+        ])
+        && data.uid is string && data.uid == userId && data.uid == request.auth.uid
+        && isValidMode(data.mode)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.generation is int && data.generation >= 1 && data.generation <= 1000000
+        && data.bestDistance is number
+        && data.bestFitness is number
+        && isValidActivation(data.activationFn)
+        && isValidGenome(data.genome)
+        && data.createdAt is timestamp;
+    }
+
+    // Private User Profile
+    match /users/{userId}/private/profile {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoURL', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Per-User Per-Mode Persisted Generation & Best Genome
+    match /users/{userId}/modeStates/{modeId} {
+      allow get: if isOwner(userId) && isValidId(modeId) && isValidMode(modeId);
+      allow list: if isVerified() && request.auth.uid == userId && resource.data.uid == request.auth.uid;
+      allow create: if isOwner(userId)
+        && isValidId(modeId)
+        && isValidMode(modeId)
+        && isValidModeState(incoming(), userId, modeId)
+        && incoming().updatedAt == request.time;
+      allow update: if isOwner(userId)
+        && isValidId(modeId)
+        && isValidMode(modeId)
+        && isValidModeState(incoming(), userId, modeId)
+        && incoming().uid == existing().uid
+        && incoming().mode == existing().mode
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'generation', 'bestDistanceEver', 'bestFitnessEver', 'milestone30mReached',
+          'activationFn', 'populationSize', 'mutationRate', 'mutationStrength',
+          'bestGenome', 'history', 'updatedAt'
+        ]);
+      allow delete: if isOwner(userId) && isValidId(modeId);
+    }
+
+    // Per-User Named Saved Champion Checkpoints
+    match /users/{userId}/checkpoints/{checkpointId} {
+      allow get: if isOwner(userId) && isValidId(checkpointId);
+      allow list: if isVerified() && request.auth.uid == userId && resource.data.uid == request.auth.uid;
+      allow create: if isOwner(userId)
+        && isValidId(checkpointId)
+        && isValidCheckpoint(incoming(), userId)
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isOwner(userId) && isValidId(checkpointId);
+    }
+  }
+}

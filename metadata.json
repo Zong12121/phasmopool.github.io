@@ -1,0 +1,8 @@
+{
+  "name": "Биомеханика и Нейроэволюция 3D",
+  "description": "Интерактивная 3D-лаборатория нейроэволюции с физическим шагающим роботом BipedWalker3D на движке cannon-es, сенсорным вводом и усложнением трассы.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
